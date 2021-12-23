@@ -12,7 +12,11 @@ package httpsp
 // errHdrMoreBytes and a "continuation" offset if the input buffer
 // was exhausted or it is not big enough to allow checking for CRLF SP.
 // It accepts also CR SP  or LF SP.
-func skipLWS(buf []byte, offs int) (int, int, ErrorHdr) {
+// If the PTokInputEndF  flag is set it will return an offset  past the
+// buffer  (== buffer length), a 0 crlf length and ErrHdrEOH if it reaches
+// the end of the buffer (otherwise it returns ErrHdrEOH only if it finds
+// a CR LF followed by non space).
+func skipLWS(buf []byte, offs int, flags uint) (int, int, ErrorHdr) {
 	i := offs
 	for ; i < len(buf); i++ {
 		c := buf[i]
@@ -24,6 +28,10 @@ func skipLWS(buf []byte, offs int) (int, int, ErrorHdr) {
 			n, crl, err := skipCRLF(buf, i)
 			if err == 0 {
 				if n >= len(buf) {
+					if flags&PTokInputEndF != 0 {
+						// special case: consider end of buf == end of hdr
+						return n, 0, ErrHdrEOH
+					}
 					// return current position, the CRLF SP has to be re-tried
 					// with more bytes
 					return i, 0, ErrHdrMoreBytes
