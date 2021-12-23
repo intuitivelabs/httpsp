@@ -72,6 +72,7 @@ const (
 	HdrWSockProto
 	HdrWSockAccept
 	HdrWSockVer
+	HdrWSockExt
 	HdrOther // generic, not recognized header
 )
 
@@ -89,6 +90,7 @@ const (
 	HdrWSockProtoF  HdrFlags = 1 << HdrWSockProto
 	HdrWSockAcceptF HdrFlags = 1 << HdrWSockAccept
 	HdrWSockVerF    HdrFlags = 1 << HdrWSockVer
+	HdrWSockExtF    HdrFlags = 1 << HdrWSockExt
 	HdrOtherF       HdrFlags = 1 << HdrOther
 )
 
@@ -107,6 +109,7 @@ var hdrTStr = [...]string{
 	HdrWSockProto:  "Sec-WebSocket-Protocol",
 	HdrWSockAccept: "Sec-WebSocket-Accept",
 	HdrWSockVer:    "Sec-WebSocket-Version",
+	HdrWSockExt:    "Sec-WebSocket-Extensions",
 	HdrOther:       "Generic",
 }
 
@@ -138,6 +141,7 @@ var hdrName2Type = [...]hdr2Type{
 	{n: []byte("sec-websocket-protocol"), t: HdrWSockProto},
 	{n: []byte("sec-websocket-accept"), t: HdrWSockAccept},
 	{n: []byte("sec-websocket-version"), t: HdrWSockVer},
+	{n: []byte("sec-websocket-extensions"), t: HdrWSockExt},
 	{n: []byte("origin"), t: HdrOrigin},
 }
 
@@ -253,24 +257,60 @@ func (hl *HdrLst) SetHdr(newhdr *Hdr) bool {
 // PHBodies defines an interface for getting pointers to parsed bodies structs.
 type PHBodies interface {
 	GetCLen() *PUIntBody
+	GetUpgrade() *PUpgrade
+	GetTrEnc() *PTrEnc
+	GetWSProto() *PWSProto
+	GetWSExt() *PWSExt
 	Reset()
 }
 
 // PHdrVals holds all the header specific parsed values structures.
 // (implements PHBodies)
 type PHdrVals struct {
-	CLen PUIntBody
+	CLen    PUIntBody
+	Upgrade PUpgrade
+	TrEnc   PTrEnc
+	WSProto PWSProto
+	WSExt   PWSExt
 }
 
 // Reset re-initializes all the parsed values.
 func (hv *PHdrVals) Reset() {
 	hv.CLen.Reset()
+	hv.Upgrade.Reset()
+	hv.TrEnc.Reset()
+	hv.WSProto.Reset()
+	hv.WSExt.Reset()
 }
 
 // GetCLen returns a pointer to the parsed content-length body.
 // It implements the PHBodies interface.
 func (hv *PHdrVals) GetCLen() *PUIntBody {
 	return &hv.CLen
+}
+
+// GetUpgrade returns a pointer to the parsed Upgrade body.
+// It implements the PHBodies interface.
+func (hv *PHdrVals) GetUpgrade() *PUpgrade {
+	return &hv.Upgrade
+}
+
+// GetTrEnc returns a pointer to the parsed Transfer-Encoding body.
+// It implements the PHBodies interface.
+func (hv *PHdrVals) GetTrEnc() *PTrEnc {
+	return &hv.TrEnc
+}
+
+// GetWSProto returns a pointer to the parsed Sec-WebSocket-Protocol body.
+// It implements the PHBodies interface.
+func (hv *PHdrVals) GetWSProto() *PWSProto {
+	return &hv.WSProto
+}
+
+// GetWSExt returns a pointer to the parsed Sec-WebSocket-Extensions body.
+// It implements the PHBodies interface.
+func (hv *PHdrVals) GetWSExt() *PWSExt {
+	return &hv.WSExt
 }
 
 // ParseHdrLine parses a header from a HTTP message.
@@ -298,9 +338,10 @@ func ParseHdrLine(buf []byte, offs int, h *Hdr, hb PHBodies) (int, ErrorHdr) {
 		hVal
 		hValEnd
 		hCLen
-		//hTrEncoding
-		//hUpgrade
-		//hCEncoding
+		hUpgrade
+		hTrEncoding
+		hWSockProto
+		hWSockExt
 		hFIN
 	)
 
@@ -320,20 +361,50 @@ func ParseHdrLine(buf []byte, offs int, h *Hdr, hb PHBodies) (int, ErrorHdr) {
 						h.Val = clenb.SVal
 					}
 				}
-				/*
-					case HdrUPgrade:
-						if upgrades := hb.GetUpgrades(); upgrades != nil {
-							if h.state != hUpgrade {
-								// new Upgrade header found
-								upgrades.HNo++
-							}
-							h.state = hUpgrade
-							n, err = ParseAllUpgradeValues(buf, o, pais)
-							if err == 0 { // fix hdr.Val
-								h.Val = upgrades.LastHVal
-							}
-						}
-				*/
+			case HdrUpgrade:
+				if upgrade := hb.GetUpgrade(); upgrade != nil {
+					if h.state != hUpgrade {
+						// new Upgrade header found
+						upgrade.HNo++
+					}
+					h.state = hUpgrade
+					n, _, err = ParseAllUpgradeValues(buf, o, upgrade)
+					// fix hdr.Val
+					h.Val = upgrade.LastParsed
+				}
+			case HdrTrEncoding:
+				if trEnc := hb.GetTrEnc(); trEnc != nil {
+					if h.state != hTrEncoding {
+						// new Transfer-Encoding header found
+						trEnc.HNo++
+					}
+					h.state = hTrEncoding
+					n, _, err = ParseAllTrEncValues(buf, o, trEnc)
+					// fix hdr.Val
+					h.Val = trEnc.LastParsed
+				}
+			case HdrWSockProto:
+				if wsProto := hb.GetWSProto(); wsProto != nil {
+					if h.state != hWSockProto {
+						// new Sec-WebSocket-Protocol header found
+						wsProto.HNo++
+					}
+					h.state = hWSockProto
+					n, _, err = ParseAllWSProtoValues(buf, o, wsProto)
+					// fix hdr.Val
+					h.Val = wsProto.LastParsed
+				}
+			case HdrWSockExt:
+				if wsExt := hb.GetWSExt(); wsExt != nil {
+					if h.state != hWSockExt {
+						// new Sec-WebSocket-Extensions header found
+						wsExt.HNo++
+					}
+					h.state = hWSockExt
+					n, _, err = ParseAllWSExtValues(buf, o, wsExt)
+					// fix hdr.Val
+					h.Val = wsExt.LastParsed
+				}
 			}
 		}
 		return n, err
@@ -464,17 +535,62 @@ func ParseHdrLine(buf []byte, offs int, h *Hdr, hb PHBodies) (int, ErrorHdr) {
 				h.state = hFIN
 			}
 			return n, err
-		/*
-			case hUpgrade: // continue Upgrade parsing (multiple values possible)
-				upgrades := hb.GetUpgrades()
-				n, err := ParseAllUpgradeValues(buf, i, pais)
-				if err == 0 { // fix hdr.Val
-					h.Val = upgrades.LastHVal
-					h.state = hFIN
-				}
-				return n, err
-			// similar for hTrEncoding and hCEncoding
-		*/
+		case hUpgrade: // continue Upgrade parsing (multiple vals possible)
+			upgrades := hb.GetUpgrade()
+			n, _, err := ParseAllUpgradeValues(buf, i, upgrades)
+			// fix hdr. Val
+			if h.Val.Empty() {
+				h.Val = upgrades.LastParsed
+			} else if !upgrades.LastParsed.Empty() {
+				// add the last parsed part to current header content
+				h.Val.Extend(upgrades.LastParsed.EndOffs())
+			}
+			if err == 0 {
+				h.state = hFIN
+			}
+			return n, err
+		case hTrEncoding: // continue Tr-Enc parsing (multiple vals possible)
+			trEnc := hb.GetTrEnc()
+			n, _, err := ParseAllTrEncValues(buf, i, trEnc)
+			// fix hdr. Val
+			if h.Val.Empty() {
+				h.Val = trEnc.LastParsed
+			} else if !trEnc.LastParsed.Empty() {
+				// add the last parsed part to current header content
+				h.Val.Extend(trEnc.LastParsed.EndOffs())
+			}
+			if err == 0 {
+				h.state = hFIN
+			}
+			return n, err
+		case hWSockProto: // continue WSockProto parsing
+			wsProto := hb.GetWSProto()
+			n, _, err := ParseAllWSProtoValues(buf, i, wsProto)
+			// fix hdr. Val
+			if h.Val.Empty() {
+				h.Val = wsProto.LastParsed
+			} else if !wsProto.LastParsed.Empty() {
+				// add the last parsed part to current header content
+				h.Val.Extend(wsProto.LastParsed.EndOffs())
+			}
+			if err == 0 {
+				h.state = hFIN
+			}
+			return n, err
+		case hWSockExt: // continue WSockExtensions parsing
+			wsExt := hb.GetWSExt()
+			n, _, err := ParseAllWSExtValues(buf, i, wsExt)
+			// fix hdr. Val
+			if h.Val.Empty() {
+				h.Val = wsExt.LastParsed
+			} else if !wsExt.LastParsed.Empty() {
+				// add the last parsed part to current header content
+				h.Val.Extend(wsExt.LastParsed.EndOffs())
+			}
+			if err == 0 {
+				h.state = hFIN
+			}
+			return n, err
 		default: // unexpected state
 			return i, ErrHdrBug
 		}

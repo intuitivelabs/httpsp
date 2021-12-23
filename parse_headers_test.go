@@ -125,6 +125,8 @@ var testsHeaders = [...]testCase{
 		eRes: eRes{err: 0, t: HdrWSockAccept}},
 	{n: "Sec-WebSocket-Version", b: "13",
 		eRes: eRes{err: 0, t: HdrWSockVer}},
+	{n: "Sec-WebSocket-Extensions", b: "16",
+		eRes: eRes{err: 0, t: HdrWSockExt}},
 	{n: "Foo", b: "generic header", eRes: eRes{err: 0, t: HdrOther}},
 }
 
@@ -139,6 +141,7 @@ func TestParseHdrLine(t *testing.T) {
 	tests := testsHeaders
 
 	for i := 0; i < (len(ws) + 2); i++ {
+		var phvals PHdrVals // NOTE: here to force re-use
 		for _, c := range tests {
 			var ws1, lws, lwsE, n string
 			if i < len(ws) {
@@ -160,9 +163,13 @@ func TestParseHdrLine(t *testing.T) {
 			c.hn = []byte(n)
 			c.hv = []byte(c.b)
 			var hdr Hdr
-			var phvals PHdrVals
+			// NOTE: reset/move phvals here to  test with a fresh
+			//       copy for each new line (instead of "adding" to
+			//       previous parsed values, like a message with repeating
+			//       headers)
 			testParseHdrLine(t, b, 0, &hdr, nil, &c.eRes)
 			hdr.Reset()
+			// same as above for phvals
 			testParseHdrLine(t, b, 0, &hdr, &phvals, &c.eRes)
 			testParseHdrLinePieces(t, b, 0, &c.eRes, 10)
 		}
@@ -238,18 +245,23 @@ Origin: null
 Host: foo.bar
 Server: Foo Bar 1.0
 Via: HTTP/1.1 foo1.bar
-Transer-Encoding: gzip
+Transer-Encoding: gzip, compress
 Date: Thu, 21 Feb 2002 13:02:03 GMT
 Content-Length: 568
 `, n: 8},
 		{m: `Host: sip-ws.example.com
 Upgrade: websocket
 Connection: Upgrade
+Transer-Encoding: gzip, compress
+Transer-Encoding: x-gzip
+Transer-Encoding: x-compress
 Sec-WebSocket-Key: anIBJedaWX14ZSBubABiPR==
 Origin: http://www.example.com
 Sec-WebSocket-Protocol: sip
+Sec-WebSocket-Protocol: h2c
 Sec-WebSocket-Version: 13
-`, n: 7},
+Sec-WebSocket-Version: 11,12
+`, n: 12},
 		{m: `Upgrade: websocket
 Connection: Upgrade
 Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=
@@ -315,8 +327,10 @@ Sec-WebSocket-Protocol: chat
 			}
 		*/
 		hl.Reset()
+		phv.Reset()
 		testParseHeadersPieces(t, buf, offs, &hl, &phv, &c, 20)
 		hl.Reset()
+		phv.Reset()
 	}
 }
 
