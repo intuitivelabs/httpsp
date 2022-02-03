@@ -50,3 +50,42 @@ func randCase(s string) string {
 	}
 	return string(r)
 }
+
+// simple slow unescape \n, \r, \tm \\
+// returns allocated byte slice
+func unescapeCRLF(s string) []byte {
+	buf := make([]byte, len(s)+2) // space for extra \r\n
+	// handle escapes: \r & \n
+	var i int
+	var escape bool
+	for _, b := range []byte(s) {
+		if b == '\\' {
+			escape = true
+			continue
+		} else {
+			if escape {
+				switch b {
+				case 'n':
+					buf[i] = '\n'
+				case 'r':
+					buf[i] = '\r'
+				case 't':
+					buf[i] = '\t'
+				case '\\':
+					buf[i] = '\\'
+				default:
+					// unrecognized => \char
+					buf[i] = '\\'
+					i++
+					buf[i] = b
+				}
+				escape = false
+			} else {
+				buf[i] = b
+			}
+		}
+		i++
+	}
+	buf = buf[:i]
+	return buf
+}
