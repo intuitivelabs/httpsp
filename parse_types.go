@@ -47,9 +47,18 @@ func (p PField) Empty() bool {
 	return p.Len == 0
 }
 
-// EndOffs returns the end offset of the "string".
+// EndOffs returns the end offset of the PField
+//  (points.directly after the end of the "string")
 func (p PField) EndOffs() int {
 	return int(p.Offs) + int(p.Len)
+}
+
+// OffsIn returns true if the offset is inside the PField.
+func (p PField) OffsIn(offs int) bool {
+	if offs >= int(p.Offs) && offs < p.EndOffs() {
+		return true
+	}
+	return false
 }
 
 // Get returns a byte slice inside buf, corresponding to the PField.
