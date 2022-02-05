@@ -121,9 +121,10 @@ func (m *PMsg) BodyType(prevMethod HTTPMethod) MsgPState {
 	// Transfer-Encoding has priority over Content-Length
 	if m.HL.PFlags&HdrTrEncodingF != 0 {
 		// if Transfer-Encoding present and chunked transfer coding
-		if m.PV.TrEnc.Encodings&TrEncChunkedF != 0 {
-			// TODO: check if the "chunked" is the final coding (?) else
-			//       fallback to MsgBodyEOF ?
+		if m.PV.TrEnc.Encodings&TrEncChunkedF != 0 &&
+			m.PV.TrEnc.Last.Enc == TrEncChunkedF {
+			//  check if "chunked" is the final coding else
+			//       fallback
 			return MsgBodyChunked
 		}
 		if !m.Request() {

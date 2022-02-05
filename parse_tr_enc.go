@@ -88,8 +88,9 @@ type PTrEnc struct {
 	// (contains a trimmed value or several values, overwritten by each
 	//  ParseAll.. call; it can also be empty, e.g. on ErrHdrMoreByte)
 	LastParsed PField
+	First      TrEncVal // even if Vals is nil, we remember the first val.
+	Last       TrEncVal // last parsed value
 	tmp        TrEncVal // temporary saved state (between calls)
-	first      TrEncVal // even if Vals is nil, we remember the first val.
 }
 
 // VNo returns the number of parsed Transfer-Encoding headers.
@@ -109,7 +110,9 @@ func (u *PTrEnc) GetExt(n int) *TrEncVal {
 		return nil
 	}
 	if n == 0 {
-		return &u.first
+		return &u.First
+	} else if n == (u.VNo() - 1) {
+		return &u.Last
 	}
 	return nil
 }
@@ -180,8 +183,9 @@ func ParseAllTrEncValues(buf []byte, offs int, u *PTrEnc) (int, int, ErrorHdr) {
 			vNo++
 			u.N++ // next value, continue parsing
 			if u.N == 1 && len(u.Vals) == 0 {
-				u.first = *pv //set u.first
+				u.First = *pv //set u.First
 			}
+			u.Last = *pv // always set Last
 			if pv == &u.tmp {
 				u.tmp.Reset() // prepare for next value (cleanup tmp state)
 			}
