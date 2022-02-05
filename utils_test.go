@@ -59,30 +59,29 @@ func unescapeCRLF(s string) []byte {
 	var i int
 	var escape bool
 	for _, b := range []byte(s) {
-		if b == '\\' {
+		if b == '\\' && escape == false {
 			escape = true
 			continue
-		} else {
-			if escape {
-				switch b {
-				case 'n':
-					buf[i] = '\n'
-				case 'r':
-					buf[i] = '\r'
-				case 't':
-					buf[i] = '\t'
-				case '\\':
-					buf[i] = '\\'
-				default:
-					// unrecognized => \char
-					buf[i] = '\\'
-					i++
-					buf[i] = b
-				}
-				escape = false
-			} else {
+		}
+		if escape {
+			switch b {
+			case 'n':
+				buf[i] = '\n'
+			case 'r':
+				buf[i] = '\r'
+			case 't':
+				buf[i] = '\t'
+			case '\\':
+				buf[i] = '\\'
+			default:
+				// unrecognized => \char
+				buf[i] = '\\'
+				i++
 				buf[i] = b
 			}
+			escape = false
+		} else {
+			buf[i] = b
 		}
 		i++
 	}
