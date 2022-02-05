@@ -34,7 +34,7 @@ func TestHexDigToI(t *testing.T) {
 
 func TestHexToURand(t *testing.T) {
 
-	const loops = 1000000
+	const loops = 100000
 	var b bytes.Buffer
 
 	for i := 0; i < loops; i++ {

@@ -4,6 +4,8 @@
 // that can be found in the LICENSE.txt file in the root of the source
 // tree.
 
+// TODO: number of values and number of diff values (if > 1 diff values => err)
+
 package httpsp
 
 // MaxCLenValueSize holds the maximum length of the Content-Length value
