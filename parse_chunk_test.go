@@ -146,11 +146,12 @@ func testParseChunkPieces(t *testing.T, chHdr, chD []byte,
 	copy(buf[len(chHdr):], chD)
 
 	o := offs
+	end := o // sent so far
 	pieces := rand.Intn(n)
 	for i := 0; i < pieces; i++ {
-		psz := rand.Intn(len(chHdr) + 1 - o)
-		end := psz + o
-		if end < tc.e.offs {
+		psz := rand.Intn(len(chHdr) + 1 - end)
+		if end+psz < tc.e.offs {
+			end += psz // always increase
 			var sz int64
 			var err ErrorHdr
 			o, sz, err = ParseChunk(buf[:end], o, cv)
