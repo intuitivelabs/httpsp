@@ -97,10 +97,11 @@ func ParseFLine(buf []byte, offs int, pl *PFLine) (int, ErrorHdr) {
 			// (l points _after_ '/')
 			var majorV, minorV PField
 			var err ErrorHdr
-			majorV.Set(l+i, l+i)
+			l += i // offset inf buf[] for the matching prefix
+			majorV.Set(l, l)
 		verloop:
-			for ; (l + i) < len(buf); l++ {
-				switch buf[l+i] {
+			for ; l < len(buf); l++ {
+				switch buf[l] {
 				case '.':
 					if majorV.Empty() {
 						majorV.Extend(l)
@@ -111,7 +112,7 @@ func ParseFLine(buf []byte, offs int, pl *PFLine) (int, ErrorHdr) {
 						minorV.Set(l+1, l+1)
 					} else {
 						// error dot encounterd while parsing minor v.
-						return l + i, ErrHdrBadChar
+						return l, ErrHdrBadChar
 					}
 				case ' ':
 					if majorV.Empty() {
@@ -126,18 +127,18 @@ func ParseFLine(buf []byte, offs int, pl *PFLine) (int, ErrorHdr) {
 					// TODO: parse a numeric version ?
 				default:
 					// non numeric => error
-					return l + i, ErrHdrBadChar
+					return l, ErrHdrBadChar
 				}
 			}
 			// TODO: save majorV & minorV ?
 			// l points to the space after version here
-			pl.Version.Set(i, i+l)
+			pl.Version.Set(i, l)
 			pl.state = flRplStatus
 			if (l + 1) >= len(buf) {
 				// end of buf
 				goto moreBytes
 			}
-			i += l + 1
+			i = l + 1
 			if buf[i+3] != ' ' ||
 				!((buf[i] >= '0' && buf[i] <= '9') &&
 					(buf[i+1] >= '0' && buf[i+1] <= '9') &&
