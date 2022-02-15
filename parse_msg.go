@@ -254,7 +254,7 @@ errBUG:
 
 // SkipBody will find the type of the message body and skip over it or
 // "continue" skipping.
-// It requires an intialised message with the headers parsed
+// It requires an initialised message with the headers parsed
 // (msg.ParsedHdrs() == true).
 // The parameters are: a buffer containing the message or the message
 // beginning (buf), a current offset in the buffer (returned by a previous
